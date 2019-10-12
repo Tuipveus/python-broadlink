@@ -58,18 +58,21 @@ def gendevice(devtype, host, mac):
     return device_class(host=host, mac=mac, devtype=devtype)
 
 
-def discover(timeout=None, local_ip_address=None):
+def discover(timeout=None, local_ip_address=None, broadcast_ip_address=None):
     if local_ip_address is None:
         local_ip_address = socket.gethostbyname(socket.gethostname())
     if local_ip_address.startswith('127.'):
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        s.connect(('8.8.8.8', 53))  # connecting to a UDP address doesn't send packets
+        s.connect(('1.1.1.1', 53))  # connecting to a UDP address doesn't send packets
         local_ip_address = s.getsockname()[0]
     address = local_ip_address.split('.')
     cs = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     cs.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     cs.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-    cs.bind((local_ip_address, 0))
+    if broadcast_ip_address is None:
+      cs.bind((local_ip_address, 0))
+    else:
+      cs.bind(('',0))
     port = cs.getsockname()[1]
     starttime = time.time()
 
@@ -113,8 +116,10 @@ def discover(timeout=None, local_ip_address=None):
     checksum = checksum & 0xffff
     packet[0x20] = checksum & 0xff
     packet[0x21] = checksum >> 8
-
-    cs.sendto(packet, ('255.255.255.255', 80))
+    if broadcast_ip_address is None :
+      cs.sendto(packet, ('255.255.255.255', 80))
+    else:
+      cs.sendto(packet, (broadcast_ip_address, 80))
     if timeout is None:
         response = cs.recvfrom(1024)
         responsepacket = bytearray(response[0])
